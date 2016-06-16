@@ -378,7 +378,7 @@ RLMObjectBase *RLMCreateObjectInRealmWithValue(RLMRealm *realm, NSString *classN
         object->_row = (*objectSchema.table)[RLMCreateOrGetRowForObject(objectSchema, primaryGetter, createOrUpdate, created)];
 
         // populate
-        NSArray *props = objectSchema.propertiesInDeclaredOrder;
+        NSArray *props = objectSchema.properties;
         for (NSUInteger i = 0; i < array.count; i++) {
             RLMProperty *prop = props[i];
             // skip primary key when updating since it doesn't change
