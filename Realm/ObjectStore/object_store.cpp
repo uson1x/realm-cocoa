@@ -377,6 +377,25 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
                        [](auto&& change) { return change.visit(Visitor()); });
 }
 
+bool ObjectStore::external_changes_are_valid(std::vector<SchemaChange> const& changes)
+{
+    using namespace schema_change;
+    struct Visitor {
+        bool operator()(AddIndex) { return true; }
+        bool operator()(AddProperty) { return false; }
+        bool operator()(AddTable) { return false; }
+        bool operator()(ChangePrimaryKey) { return false; }
+        bool operator()(ChangePropertyType) { return false; }
+        bool operator()(MakePropertyNullable) { return false; }
+        bool operator()(MakePropertyRequired) { return false; }
+        bool operator()(RemoveIndex) { return true; }
+        bool operator()(RemoveProperty) { return false; }
+    };
+
+    return std::all_of(begin(changes), end(changes),
+                       [](auto&& change) { return change.visit(Visitor()); });
+}
+
 void ObjectStore::verify_no_changes_required(std::vector<SchemaChange> const& changes)
 {
     verify_no_errors<SchemaMismatchException>(SchemaDifferenceExplainer(), changes);

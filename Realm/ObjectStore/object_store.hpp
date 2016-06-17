@@ -52,6 +52,7 @@ public:
 
     // Similar to above, but returns a bool rather than throwing/not throwing
     static bool needs_migration(std::vector<SchemaChange> const& changes);
+    static bool external_changes_are_valid(std::vector<SchemaChange> const& changes);
 
     // check if any of the schema changes in the list are forbidden in
     // additive-only mode, and if any are throw an exception

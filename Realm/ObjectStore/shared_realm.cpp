@@ -157,6 +157,7 @@ Group& Realm::read_group()
 {
     if (!m_group) {
         m_group = &const_cast<Group&>(m_shared_group->begin_read());
+        add_schema_change_handler();
     }
     return *m_group;
 }
@@ -267,10 +268,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     if (no_changes_required())
         return;
-
     // Either the schema version has changed or we need to do non-migration changes
-    transaction::begin(*m_shared_group, m_binding_context.get(),
-                       /* error on schema changes */ false);
+
+    m_group->set_schema_change_notification_handler(nullptr);
+    transaction::begin(*m_shared_group, m_binding_context.get());
+    add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
     struct WriteTransactionGuard {
@@ -309,6 +311,29 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     commit_transaction();
     m_coordinator->update_schema(m_schema, version);
+}
+
+void Realm::add_schema_change_handler()
+{
+    m_group->set_schema_change_notification_handler([&] {
+        switch (m_config.schema_mode) {
+            case SchemaMode::ReadOnly: REALM_UNREACHABLE();
+            case SchemaMode::Automatic:
+                if (ObjectStore::external_changes_are_valid(ObjectStore::schema_from_group(read_group()).compare(m_schema)))
+                    break;
+                // fallthrough
+            case SchemaMode::Manual:
+            case SchemaMode::ResetFile:
+                throw std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way");
+            case SchemaMode::Additive: {
+                auto new_schema = ObjectStore::schema_from_group(read_group());
+                auto required_changes = m_schema.compare(new_schema);
+                ObjectStore::verify_valid_additive_changes(required_changes);
+                m_schema.copy_table_columns_from(new_schema);
+                break;
+            }
+        }
+    });
 }
 
 static void check_read_write(Realm *realm)

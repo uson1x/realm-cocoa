@@ -36,8 +36,7 @@ void advance(SharedGroup& sg, BindingContext* binding_context,
 // Begin a write transaction
 // If the read transaction version is not up to date, will first advance to the
 // most recent read transaction and sent notifications to delegate
-void begin(SharedGroup& sg, BindingContext* binding_context,
-           bool validate_schema_changes=true);
+    void begin(SharedGroup& sg, BindingContext* binding_context);
 
 // Commit a write transaction
 void commit(SharedGroup& sg, BindingContext* binding_context);
