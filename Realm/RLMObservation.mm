@@ -319,7 +319,7 @@ void RLMTrackDeletions(__unsafe_unretained RLMRealm *const realm, dispatch_block
 
     // This callback is called by core with a list of row deletions and
     // resulting link nullifications immediately before things are deleted and nullified
-    realm.group->set_cascade_notification_handler([&](realm::Group::CascadeNotification const& cs) {
+    realm.group.set_cascade_notification_handler([&](realm::Group::CascadeNotification const& cs) {
         for (auto const& link : cs.links) {
             size_t table_ndx = link.origin_table->get_index_in_group();
             if (table_ndx >= observers.size() || !observers[table_ndx]) {
@@ -389,7 +389,7 @@ void RLMTrackDeletions(__unsafe_unretained RLMRealm *const realm, dispatch_block
         block();
     }
     catch (...) {
-        realm.group->set_cascade_notification_handler(nullptr);
+        realm.group.set_cascade_notification_handler(nullptr);
         throw;
     }
 
@@ -400,7 +400,7 @@ void RLMTrackDeletions(__unsafe_unretained RLMRealm *const realm, dispatch_block
         info->didChange(RLMInvalidatedKey);
     }
 
-    realm.group->set_cascade_notification_handler(nullptr);
+    realm.group.set_cascade_notification_handler(nullptr);
 }
 
 namespace {

@@ -36,7 +36,8 @@ namespace realm {
         LinkingObjects = 14,
     };
 
-    static inline const char *string_for_property_type(PropertyType type) {
+    static const char *string_for_property_type(PropertyType type)
+    {
         switch (type) {
             case PropertyType::String:
                 return "string";
@@ -74,14 +75,29 @@ namespace realm {
 
         size_t table_column = -1;
         bool requires_index() const { return is_primary || is_indexed; }
-        bool is_indexable() const {
+        bool is_indexable() const
+        {
             return type == PropertyType::Int
                 || type == PropertyType::Bool
                 || type == PropertyType::String
                 || type == PropertyType::Date;
         }
-        std::string type_string() const {
-            switch(type) {
+
+        bool type_is_nullable() const
+        {
+            return type == PropertyType::Int
+                || type == PropertyType::Bool
+                || type == PropertyType::Float
+                || type == PropertyType::Double
+                || type == PropertyType::Date
+                || type == PropertyType::String
+                || type == PropertyType::Data
+                || type == PropertyType::Object;
+        }
+
+        std::string type_string() const
+        {
+            switch (type) {
                 case PropertyType::String:
                 case PropertyType::Int:
                 case PropertyType::Bool:
@@ -100,6 +116,19 @@ namespace realm {
             }
         }
     };
+
+    inline bool operator==(Property const& lft, Property const& rgt)
+    {
+        // note: not checking table_column
+        // ordered roughly by the cost of the check
+        return lft.type == rgt.type
+            && lft.is_primary == rgt.is_primary
+            && lft.is_nullable == rgt.is_nullable
+            && lft.requires_index() == rgt.requires_index()
+            && lft.name == rgt.name
+            && lft.object_type == rgt.object_type
+            && lft.link_origin_property_name == rgt.link_origin_property_name;
+    }
 }
 
 #endif /* REALM_PROPERTY_HPP */
