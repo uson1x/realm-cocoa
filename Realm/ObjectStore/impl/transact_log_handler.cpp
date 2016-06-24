@@ -105,6 +105,37 @@ private:
     size_t m_current_table = 0;
 };
 
+template<typename Container>
+void rotate(Container& container, size_t from, size_t to)
+{
+    REALM_ASSERT(from != to);
+    if (from >= container.size() && to >= container.size())
+        return;
+    if (from >= container.size() || to >= container.size())
+        container.resize(std::max(from, to) + 1);
+    if (from < to)
+        std::rotate(begin(container) + from, begin(container) + to, begin(container) + to + 1);
+    else
+        std::rotate(begin(container) + to, begin(container) + from, begin(container) + from + 1);
+}
+
+template<typename Container>
+void insert_empty_at(Container& container, size_t pos)
+{
+    if (pos < container.size())
+        container.insert(container.begin() + pos, typename Container::value_type{});
+}
+
+void adjust_for_move(size_t& value, size_t from, size_t to)
+{
+    if (value == from)
+        value = to;
+    else if (value > from && value < to)
+        --value;
+    else if (value < from && value > to)
+        ++value;
+}
+
 // Extends TransactLogValidator to also track changes and report it to the
 // binding context if any properties are being observed
 class TransactLogObserver : public MarkDirtyMixin<TransactLogObserver> {
@@ -120,10 +151,6 @@ class TransactLogObserver : public MarkDirtyMixin<TransactLogObserver> {
 
     // Change information for the currently selected LinkList, if any
     ColumnInfo* m_active_linklist = nullptr;
-
-    // Tables which were created during the transaction being processed, which
-    // can have columns inserted without a schema version bump
-    std::vector<size_t> m_new_tables;
 
     // Get the change info for the given column, creating it if needed
     static ColumnInfo& get_change(ObserverState& state, size_t i)
@@ -194,18 +221,15 @@ public:
         m_context->will_change(m_observers, invalidated);
     }
 
-    bool insert_group_level_table(size_t table_ndx, size_t, StringData)
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t prior_size, bool)
     {
-        for (auto& observer : m_observers) {
-            if (observer.table_ndx >= table_ndx)
-                ++observer.table_ndx;
+        if (row_ndx == prior_size) {
+            return true;
         }
-        return true;
-    }
-
-    bool insert_empty_rows(size_t, size_t, size_t, bool)
-    {
-        // rows are only inserted at the end, so no need to do anything
+        for (auto& observer : m_observers) {
+            if (observer.row_ndx >= row_ndx)
+                observer.row_ndx += num_rows;
+        }
         return true;
     }
 
@@ -360,6 +384,39 @@ public:
         }
         return true;
     }
+
+    bool insert_column(size_t ndx, DataType, StringData, bool)
+    {
+        for (auto& observer : m_observers) {
+            insert_empty_at(observer.changes, ndx);
+        }
+        return true;
+    }
+
+    bool insert_group_level_table(size_t ndx, size_t, StringData)
+    {
+        for (auto& observer : m_observers) {
+            if (observer.table_ndx >= ndx)
+                ++observer.table_ndx;
+        }
+        return true;
+    }
+
+    bool move_column(size_t from, size_t to)
+    {
+        for (auto& observer : m_observers)
+            rotate(observer.changes, from, to);
+        return true;
+    }
+
+    bool move_group_level_table(size_t from, size_t to)
+    {
+        for (auto& observer : m_observers)
+            adjust_for_move(observer.table_ndx, from, to);
+        return true;
+    }
+
+    bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 };
 
 // Extends TransactLogValidator to track changes made to LinkViews
@@ -510,6 +567,46 @@ public:
             change->clear(std::numeric_limits<size_t>::max());
         return true;
     }
+
+    bool insert_column(size_t ndx, DataType, StringData, bool)
+    {
+        for (auto& list : m_info.lists) {
+            if (list.col_ndx >= ndx)
+                ++list.col_ndx;
+        }
+        return true;
+    }
+
+    bool insert_group_level_table(size_t ndx, size_t, StringData)
+    {
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx >= ndx)
+                ++list.table_ndx;
+        }
+        insert_empty_at(m_info.tables, ndx);
+        insert_empty_at(m_info.table_moves_needed, ndx);
+        insert_empty_at(m_info.table_modifications_needed, ndx);
+        return true;
+    }
+
+    bool move_column(size_t from, size_t to)
+    {
+        for (auto& list : m_info.lists)
+            adjust_for_move(list.col_ndx, from, to);
+        return true;
+    }
+
+    bool move_group_level_table(size_t from, size_t to)
+    {
+        for (auto& list : m_info.lists)
+            adjust_for_move(list.table_ndx, from, to);
+        rotate(m_info.tables, from, to);
+        rotate(m_info.table_modifications_needed, from, to);
+        rotate(m_info.table_moves_needed, from, to);
+        return true;
+    }
+
+    bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 };
 } // anonymous namespace
 
