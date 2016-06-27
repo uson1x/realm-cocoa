@@ -95,6 +95,9 @@ void RLMInitializeSwiftAccessorGenerics(__unsafe_unretained RLMObjectBase *const
     if (!object || !object->_row || !object->_objectSchema->_isSwiftClass) {
         return;
     }
+    if (![object isKindOfClass:object->_objectSchema.objectClass]) {
+        return;
+    }
 
     for (RLMProperty *prop in object->_objectSchema.swiftGenericProperties) {
         if (prop->_type == RLMPropertyTypeArray) {
@@ -103,13 +106,17 @@ void RLMInitializeSwiftAccessorGenerics(__unsafe_unretained RLMObjectBase *const
                                                                    realm:object->_realm
                                                                      key:prop.name
                                                             parentSchema:object->_objectSchema];
-            [RLMObjectUtilClass(YES) initializeListProperty:object property:prop array:array];
+            [object_getIvar(object, prop.swiftIvar) set_rlmArray:array];
         }
         else if (prop.type == RLMPropertyTypeLinkingObjects) {
-            [RLMObjectUtilClass(YES) initializeLinkingObjectsProperty:object property:prop];
+            id linkingObjects = object_getIvar(object, prop.swiftIvar);
+            [linkingObjects setObject:(id)[[RLMWeakObjectHandle alloc] initWithObject:object]];
+            [linkingObjects setProperty:prop];
         }
         else {
-            [RLMObjectUtilClass(YES) initializeOptionalProperty:object property:prop];
+            RLMOptionalBase *optional = object_getIvar(object, prop.swiftIvar);
+            optional.property = prop;
+            optional.object = object;
         }
     }
 }
