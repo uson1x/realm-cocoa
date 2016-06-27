@@ -177,13 +177,7 @@ public class Object: RLMObjectBase {
             if realm == nil {
                 return value(forKey: key)
             }
-            let property = RLMValidatedGetProperty(self, key)
-            if property.type == .array {
-                return listForProperty(prop: property)
-            }
-            // No special logic is needed for optional numbers here because we
-            // just want to return the NSNumber anyway
-            return RLMDynamicGet(self, property)
+            return RLMDynamicGetByName(self, key, true)
         }
         set(value) {
             if realm == nil {
@@ -212,7 +206,8 @@ public class Object: RLMObjectBase {
     :nodoc:
     */
     public func dynamicList(_ propertyName: String) -> List<DynamicObject> {
-        return unsafeBitCast(listForProperty(prop: RLMValidatedGetProperty(self, propertyName)), to: List<DynamicObject>.self)
+        return unsafeBitCast(RLMDynamicGetByName(self, propertyName, true),
+                             to: List<DynamicObject>.self)
     }
 
     // MARK: Equatable
@@ -248,11 +243,6 @@ public class Object: RLMObjectBase {
     public override required init(value: AnyObject, schema: RLMSchema) {
         super.init(value: value, schema: schema)
     }
-
-    // Helper for getting the list object for a property
-    internal func listForProperty(prop: RLMProperty) -> RLMListBase {
-        return object_getIvar(self, prop.swiftIvar) as! RLMListBase
-    }
 }
 
 
@@ -260,17 +250,17 @@ public class Object: RLMObjectBase {
 /// Object interface which allows untyped getters and setters for Objects.
 /// :nodoc:
 public final class DynamicObject: Object {
-    private var listProperties = [String: List<DynamicObject>]()
-
-    // Override to create List<DynamicObject> on access
-    internal override func listForProperty(prop: RLMProperty) -> RLMListBase {
-        if let list = listProperties[prop.name] {
-            return list
+    public override subscript(key: String) -> AnyObject? {
+        get {
+            let value = RLMDynamicGetByName(self, key)
+            if let array = value as? RLMArray {
+                return List<DynamicObject>(rlmArray: array)
+            }
+            return value
         }
-        let list = List<DynamicObject>()
-        list._rlmArray = RLMDynamicGet(self, prop) as! RLMArray
-        listProperties[prop.name] = list
-        return list
+        set(value) {
+            RLMDynamicValidatedSet(self, key, value)
+        }
     }
 
     /// :nodoc:
@@ -545,13 +535,7 @@ public class Object: RLMObjectBase {
             if realm == nil {
                 return valueForKey(key)
             }
-            let property = RLMValidatedGetProperty(self, key)
-            if property.type == .Array {
-                return listForProperty(property)
-            }
-            // No special logic is needed for optional numbers here because we
-            // just want to return the NSNumber anyway
-            return RLMDynamicGet(self, property)
+            return RLMDynamicGetByName(self, key, true)
         }
         set(value) {
             if realm == nil {
@@ -578,7 +562,8 @@ public class Object: RLMObjectBase {
     :nodoc:
     */
     public func dynamicList(propertyName: String) -> List<DynamicObject> {
-        return unsafeBitCast(listForProperty(RLMValidatedGetProperty(self, propertyName)), List<DynamicObject>.self)
+        return unsafeBitCast(RLMDynamicGetByName(self, propertyName, true),
+                             List<DynamicObject>.self)
     }
 
     // MARK: Equatable
@@ -614,11 +599,6 @@ public class Object: RLMObjectBase {
     public override required init(value: AnyObject, schema: RLMSchema) {
         super.init(value: value, schema: schema)
     }
-
-    // Helper for getting the list object for a property
-    internal func listForProperty(prop: RLMProperty) -> RLMListBase {
-        return object_getIvar(self, prop.swiftIvar) as! RLMListBase
-    }
 }
 
 
@@ -626,17 +606,17 @@ public class Object: RLMObjectBase {
 /// Object interface which allows untyped getters and setters for Objects.
 /// :nodoc:
 public final class DynamicObject: Object {
-    private var listProperties = [String: List<DynamicObject>]()
-
-    // Override to create List<DynamicObject> on access
-    internal override func listForProperty(prop: RLMProperty) -> RLMListBase {
-        if let list = listProperties[prop.name] {
-            return list
+    public override subscript(key: String) -> AnyObject? {
+        get {
+            let value = RLMDynamicGetByName(self, key, false)
+            if let array = value as? RLMArray {
+                return List<DynamicObject>(rlmArray: array)
+            }
+            return value
         }
-        let list = List<DynamicObject>()
-        list._rlmArray = RLMDynamicGet(self, prop) as! RLMArray
-        listProperties[prop.name] = list
-        return list
+        set(value) {
+            RLMDynamicValidatedSet(self, key, value)
+        }
     }
 
     /// :nodoc:

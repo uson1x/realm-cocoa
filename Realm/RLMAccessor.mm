@@ -19,10 +19,11 @@
 #import "RLMAccessor.h"
 
 #import "RLMArray_Private.hpp"
-#import "RLMObservation.hpp"
+#import "RLMListBase.h"
 #import "RLMObjectSchema_Private.hpp"
 #import "RLMObjectStore.h"
 #import "RLMObject_Private.hpp"
+#import "RLMObservation.hpp"
 #import "RLMProperty_Private.h"
 #import "RLMRealm_Private.hpp"
 #import "RLMResults_Private.h"
@@ -877,7 +878,7 @@ RLMProperty *RLMValidatedGetProperty(__unsafe_unretained RLMObjectBase *const ob
     return prop;
 }
 
-id RLMDynamicGet(__unsafe_unretained RLMObjectBase *obj, __unsafe_unretained RLMProperty *prop) {
+id RLMDynamicGet(__unsafe_unretained RLMObjectBase *const obj, __unsafe_unretained RLMProperty *const prop) {
     NSUInteger col = prop.column;
     switch (accessorCodeForType(prop.objcType, prop.type)) {
         case RLMAccessorCodeByte:         return @((char)RLMGetLong(obj, col));
@@ -900,4 +901,16 @@ id RLMDynamicGet(__unsafe_unretained RLMObjectBase *obj, __unsafe_unretained RLM
         case RLMAccessorCodeBoolObject:   return RLMGetBoolObject(obj, col);
         case RLMAccessorCodeLinkingObjects: return RLMGetLinkingObjects(obj, prop);
     }
+}
+
+id RLMDynamicGetByName(__unsafe_unretained RLMObjectBase *const obj, __unsafe_unretained NSString *const propName, bool asList) {
+    RLMProperty *prop = RLMValidatedGetProperty(obj, propName);
+    if (asList && prop.type == RLMPropertyTypeArray && prop.swiftIvar) {
+        RLMListBase *list = object_getIvar(obj, prop.swiftIvar);
+        if (!list._rlmArray) {
+            list._rlmArray = RLMDynamicGet(obj, prop);
+        }
+        return list;
+    }
+    return RLMDynamicGet(obj, prop);
 }
