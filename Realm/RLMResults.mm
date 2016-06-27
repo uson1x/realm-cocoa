@@ -50,6 +50,7 @@ using namespace realm;
 @implementation RLMResults {
     realm::Results _results;
     RLMRealm *_realm;
+    RLMObjectInfo *_info;
 }
 
 - (instancetype)initPrivate {
@@ -112,7 +113,7 @@ static auto translateErrors(Function&& f, NSString *aggregateMethod=nil) {
     RLMResults *ar = [[self alloc] initPrivate];
     ar->_results = std::move(results);
     ar->_realm = objectSchema.realm;
-    ar->_objectSchema = objectSchema;
+    ar->_info->rlmObjectSchema = objectSchema;
     return ar;
 }
 
@@ -138,12 +139,16 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
     return RLMStringDataToNSString(_results.get_object_type());
 }
 
+- (RLMObjectSchema *)objectSchema {
+    return _info->rlmObjectSchema;
+}
+
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state
                                   objects:(__unused __unsafe_unretained id [])buffer
                                     count:(NSUInteger)len {
     __autoreleasing RLMFastEnumerator *enumerator;
     if (state->state == 0) {
-        enumerator = [[RLMFastEnumerator alloc] initWithCollection:self objectSchema:_objectSchema];
+        enumerator = [[RLMFastEnumerator alloc] initWithCollection:self objectSchema:_info->rlmObjectSchema];
         state->extra[0] = (long)enumerator;
         state->extra[1] = self.count;
     }
@@ -173,7 +178,7 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
     }
 
     Query query = translateErrors([&] { return _results.get_query(); });
-    RLMUpdateQueryWithPredicate(&query, predicate, _realm.schema, _objectSchema);
+    RLMUpdateQueryWithPredicate(&query, predicate, _realm.schema, _info->rlmObjectSchema);
 
     query.sync_view_if_needed();
 
@@ -197,18 +202,18 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
 
 - (id)objectAtIndex:(NSUInteger)index {
     return translateErrors([&] {
-        return RLMCreateObjectAccessor(_realm, _objectSchema, _results.get(index));
+        return RLMCreateObjectAccessor(_realm, _info->rlmObjectSchema, _results.get(index));
     });
 }
 
 - (id)firstObject {
     auto row = translateErrors([&] { return _results.first(); });
-    return row ? RLMCreateObjectAccessor(_realm, _objectSchema, *row) : nil;
+    return row ? RLMCreateObjectAccessor(_realm, _info->rlmObjectSchema, *row) : nil;
 }
 
 - (id)lastObject {
     auto row = translateErrors([&] { return _results.last(); });
-    return row ? RLMCreateObjectAccessor(_realm, _objectSchema, *row) : nil;
+    return row ? RLMCreateObjectAccessor(_realm, _info->rlmObjectSchema, *row) : nil;
 }
 
 - (NSUInteger)indexOfObject:(RLMObject *)object {
@@ -327,9 +332,9 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
         if (_results.get_mode() == Results::Mode::Empty) {
             return self;
         }
-        auto query = _objectSchema.table->where();
-        RLMUpdateQueryWithPredicate(&query, predicate, _realm.schema, _objectSchema);
-        return [RLMResults resultsWithObjectSchema:_objectSchema
+        auto query = _info->table()->where();
+        RLMUpdateQueryWithPredicate(&query, predicate, _realm.schema, _info->rlmObjectSchema);
+        return [RLMResults resultsWithObjectSchema:_info->rlmObjectSchema
                                            results:_results.filter(std::move(query))];
     });
 }
@@ -344,8 +349,8 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
             return self;
         }
 
-        return [RLMResults resultsWithObjectSchema:_objectSchema
-                                           results:_results.sort(RLMSortOrderFromDescriptors(_objectSchema, properties))];
+        return [RLMResults resultsWithObjectSchema:_info->rlmObjectSchema
+                                           results:_results.sort(RLMSortOrderFromDescriptors(_info->rlmObjectSchema, properties))];
     });
 }
 
@@ -354,7 +359,7 @@ static inline void RLMResultsValidateInWriteTransaction(__unsafe_unretained RLMR
 }
 
 - (id)aggregate:(NSString *)property method:(util::Optional<Mixed> (Results::*)(size_t))method methodName:(NSString *)methodName {
-    size_t column = RLMValidatedProperty(_objectSchema, property).column;
+    size_t column = _info->tableColumn(property);
     auto value = translateErrors([&] { return (_results.*method)(column); }, methodName);
     if (!value) {
         return nil;

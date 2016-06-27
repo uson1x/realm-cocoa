@@ -18,13 +18,13 @@
 
 #import <Realm/RLMObject.h>
 
+typedef struct RLMObjectInfo RLMObjectInfo;
+
 // RLMObject accessor and read/write realm
 @interface RLMObjectBase () {
-  @public
+@public
     RLMRealm *_realm;
-    // objectSchema is a cached pointer to an object stored in the RLMSchema
-    // owned by _realm, so it's guaranteed to stay alive as long as this object
-    // without retaining it (and retaining it makes iteration slower)
+    RLMObjectInfo *_info;
     __unsafe_unretained RLMObjectSchema *_objectSchema;
 }
 
@@ -33,7 +33,7 @@
 
 // live accessor initializer
 - (instancetype)initWithRealm:(__unsafe_unretained RLMRealm *const)realm
-                       schema:(__unsafe_unretained RLMObjectSchema *const)schema NS_DESIGNATED_INITIALIZER;
+                       schema:(RLMObjectInfo *)schema NS_DESIGNATED_INITIALIZER;
 
 // shared schema for this class
 + (RLMObjectSchema *)sharedSchema;
@@ -50,7 +50,7 @@
 
 // live accessor initializer
 - (instancetype)initWithRealm:(__unsafe_unretained RLMRealm *const)realm
-                       schema:(__unsafe_unretained RLMObjectSchema *const)schema NS_DESIGNATED_INITIALIZER;
+                       schema:(RLMObjectInfo *)schema NS_DESIGNATED_INITIALIZER;
 
 @end
 

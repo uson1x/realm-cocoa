@@ -156,9 +156,6 @@ using namespace realm;
                                     withObject:objectSchema];
     objectSchema.realm = _realm;
     _realm.schema.objectSchema = [mutableObjectSchemas copy];
-    for (RLMProperty *property in objectSchema.properties) {
-        property.column = objectStoreSchema.property_for_name(property.name.UTF8String)->table_column;
-    }
 }
 
 @end
