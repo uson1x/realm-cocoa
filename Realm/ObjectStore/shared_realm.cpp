@@ -324,12 +324,30 @@ void Realm::add_schema_change_handler()
                 // fallthrough
             case SchemaMode::Manual:
             case SchemaMode::ResetFile:
-                throw std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way");
+                // FIXME: throwing from here doesn't work because it's too late
+                // to cancel the advance, and so the SharedGroup is left in an
+                // inconsistent state
+                // Need to switch back to validating in an observer.
+                REALM_TERMINATE("invalid schema change");
+//                throw std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way");
             case SchemaMode::Additive: {
                 auto new_schema = ObjectStore::schema_from_group(read_group());
                 auto required_changes = m_schema.compare(new_schema);
                 ObjectStore::verify_valid_additive_changes(required_changes);
+#if 0
+                // FIXME: binding doesn't support changes yet
                 m_schema.copy_table_columns_from(new_schema);
+#else
+                for (auto const& object_schema : m_schema) {
+                    auto const& matching_object_schema = *new_schema.find(object_schema.name);
+                    for (auto const& property : object_schema.persisted_properties) {
+                        if (property.table_column != matching_object_schema.property_for_name(property.name)->table_column)
+                            // FIXME: see above
+                            REALM_TERMINATE("invalid schema change");
+//                            throw std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way");
+                    }
+                }
+#endif
                 break;
             }
         }

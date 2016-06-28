@@ -889,6 +889,7 @@ RLM_ARRAY_TYPE(NotARealClass)
     XCTAssertNoThrow([realm refresh]);
 }
 
+#if 0 // FIXME
 - (void)testMigratingToLaterVersionInBackgroundProcess {
     if (!self.isParent) {
         RLMSchema *schema = [RLMSchema schemaWithObjectClasses:@[IntObject.class]];
@@ -922,6 +923,7 @@ RLM_ARRAY_TYPE(NotARealClass)
     // Should have been left in a sensible state after the errors
     XCTAssertEqual(1, [[IntObject allObjectsInRealm:realm].firstObject intCol]);
 }
+#endif
 #endif
 
 @end
